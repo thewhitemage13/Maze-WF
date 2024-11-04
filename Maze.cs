@@ -83,7 +83,8 @@
         {
             foreach (var control in Parent.Controls)
             {
-               ((PictureBox)control).Visible = true;
+                if (control is PictureBox)
+                    ((PictureBox)control).Visible = true;
             }
         }
     }

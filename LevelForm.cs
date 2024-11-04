@@ -6,113 +6,110 @@
         public Character Hero;
         public TextBox textBox;
         private AudioPlayer audioPlayer;
+        private int timeLeft = 60;
+
         public LevelForm()
         {
             audioPlayer = new AudioPlayer();
             InitializeComponent();
             FormSettings();
+            timer1.Interval = 1000;
+            timer1.Tick += Timer1_Tick;
             audioPlayer.PlaySound(@"C:\Users\lolim\Desktop\Home Work\2.2. Maze\GameEffects\02-Metal-Area.wav");
             this.FormClosing += LevelForm_FormClosing;
             StartGameProcess();
         }
+
         public void FormSettings()
         {
-            //Text = Configuration.Title;
+            Text = Configuration.Title;
             BackColor = Configuration.Background;
-
-            //ClientSize = new Size(
-            //Configuration.Columns * Configuration.PictureSide,
-            //Configuration.Rows * Configuration.PictureSide);
-
             StartPosition = FormStartPosition.CenterScreen;
+            statusStrip1.BackColor = Configuration.Background;
         }
 
         public void StartGameProcess()
         {
-            Hero = new Character(this);
+            Hero = new Character(this) { AmountOfHealth = 100 };
             maze = new Maze(this);
+            UpdateStatusLabels();
+            timeLeft = 60;
+            toolStripStatusLabel4.Text = $"There's time left: {timeLeft} sec.";
+            timer1.Start();
             maze.Generate();
             maze.Show();
         }
-        // Дз: 
-        // пробовал добавить TextBox, чтоб во время подбора монет информация высвечиваласт возле игрового поля,
-        // но почему-то если добавляю новый элемент (тот же TextBox), то ничего не запускается и вылетает ;(
+
         private void KeyDownHandler(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Right)
-            {
-                if (maze.cells[Hero.PosY, Hero.PosX + 1].Type != CellType.WALL)
-                {
-                    if (maze.cells[Hero.PosY, Hero.PosX + 1].Type == CellType.MEDAL)
-                    {
-                        Hero.MedalCount++;
-                        audioPlayer.PlaySound(@"C:\Users\lolim\Desktop\Home Work\2.2. Maze\GameEffects\money.wav");
-                        Text = Hero.MedalCount.ToString();
-                    }
+            if (e.KeyCode == Keys.Right) MoveHero(0, 1);
+            else if (e.KeyCode == Keys.Left && Hero.PosX > 0) MoveHero(0, -1);
+            else if (e.KeyCode == Keys.Up && Hero.PosY > 0) MoveHero(-1, 0);
+            else if (e.KeyCode == Keys.Down) MoveHero(1, 0);
+        }
 
-                    Hero.Clear();
-                    Hero.MoveRight();
-                    Hero.Show();
-                    bool check = Hero.CheckVictory();
-                    if (check)
-                    {
-                        audioPlayer.PlaySound(@"C:\Users\lolim\Desktop\Home Work\2.2. Maze\GameEffects\Game-Over.wav");
-                    }
-                }
-            }
-            else if (e.KeyCode == Keys.Left && Hero.PosX != 0)
-            {
-                if (maze.cells[Hero.PosY, Hero.PosX - 1].Type != CellType.WALL)
-                {
-                    if (maze.cells[Hero.PosY, Hero.PosX - 1].Type == CellType.MEDAL)
-                    {
-                        Hero.MedalCount++;
-                        audioPlayer.PlaySound(@"C:\Users\lolim\Desktop\Home Work\2.2. Maze\GameEffects\money.wav");
-                        Text = Hero.MedalCount.ToString();
-                    }
-                    Hero.Clear();
-                    Hero.MoveLeft();
-                    Hero.Show();
-                    Hero.CheckVictory();
-                }
-            }
-            else if (e.KeyCode == Keys.Up)
-            {
-                if (maze.cells[Hero.PosY - 1, Hero.PosX].Type != CellType.WALL)
-                {
-                    if (maze.cells[Hero.PosY - 1, Hero.PosX].Type == CellType.MEDAL)
-                    {
+        private void MoveHero(int deltaY, int deltaX)
+        {
+            Hero.StepCount++;
+            UpdateStepCount();
 
-                        Hero.MedalCount++;
-                        audioPlayer.PlaySound(@"C:\Users\lolim\Desktop\Home Work\2.2. Maze\GameEffects\money.wav");
-                        Text = Hero.MedalCount.ToString();
-                    }
-                    Hero.Clear();
-                    Hero.MoveUp();
-                    Hero.Show();
-                    Hero.CheckVictory();
-                }
-            }
-            else if (e.KeyCode == Keys.Down)
+            var targetCell = maze.cells[Hero.PosY + deltaY, Hero.PosX + deltaX];
+            if (targetCell.Type != CellType.WALL)
             {
-                if (maze.cells[Hero.PosY + 1, Hero.PosX].Type != CellType.WALL)
+                if (targetCell.Type == CellType.MEDAL) CollectMedal();
+                if (targetCell.Type == CellType.ENEMY) TakeDamage();
+
+                Hero.Clear();
+                Hero.Move(deltaY, deltaX);
+                Hero.Show();
+
+                if (Hero.CheckVictory())
                 {
-                    if (maze.cells[Hero.PosY + 1, Hero.PosX].Type == CellType.MEDAL)
-                    {
-                        Hero.MedalCount++;
-                        audioPlayer.PlaySound(@"C:\Users\lolim\Desktop\Home Work\2.2. Maze\GameEffects\money.wav");
-                        Text = Hero.MedalCount.ToString();
-                    }
-                    Hero.Clear();
-                    Hero.MoveDown();
-                    Hero.Show();
-                    Hero.CheckVictory();
+                    audioPlayer.PlaySound(@"C:\Users\lolim\Desktop\Home Work\2.2. Maze\GameEffects\Game-Over.wav");
+                    MessageBox.Show("Победа!");
+                    this.Close();
                 }
             }
         }
-        private void LevelForm_Load(object sender, EventArgs e)
-        {
 
+        private void CollectMedal()
+        {
+            Hero.MedalCount++;
+            audioPlayer.PlaySound(@"C:\Users\lolim\Desktop\Home Work\2.2. Maze\GameEffects\money.wav");
+            UpdateMedalCount();
+        }
+
+        private void TakeDamage()
+        {
+            Hero.AmountOfHealth -= 20;
+            UpdateHealth();
+            if (Hero.AmountOfHealth <= 0)
+            {
+                MessageBox.Show("You've lost! You're out of health points.");
+                this.Close();
+            }
+        }
+
+        private void UpdateStatusLabels()
+        {
+            toolStripStatusLabel1.Text = $"Medals: {Hero.MedalCount}";
+            toolStripStatusLabel2.Text = $"Step Count: {Hero.StepCount}";
+            toolStripStatusLabel3.Text = $"Amount Of Health: {Hero.AmountOfHealth}";
+        }
+
+        private void UpdateStepCount()
+        {
+            toolStripStatusLabel2.Text = $"Step Count: {Hero.StepCount}";
+        }
+
+        private void UpdateMedalCount()
+        {
+            toolStripStatusLabel1.Text = $"Medals: {Hero.MedalCount}";
+        }
+
+        private void UpdateHealth()
+        {
+            toolStripStatusLabel3.Text = $"Amount Of Health: {Hero.AmountOfHealth}";
         }
 
         private void LevelForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -120,5 +117,19 @@
             audioPlayer.Stop();
         }
 
+        private void Timer1_Tick(object sender, EventArgs e)
+        {
+            if (timeLeft > 0)
+            {
+                timeLeft--;
+                toolStripStatusLabel4.Text = $"There's time left: {timeLeft} sec.";
+            }
+            else
+            {
+                timer1.Stop();
+                MessageBox.Show("Time's up!");
+                this.Close();
+            }
+        }
     }
 }
